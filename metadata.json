@@ -1,0 +1,5 @@
+{
+  "name": "Elleo Interview Mate",
+  "description": "A digital interview evaluation platform for Elleo Group, featuring structured evaluation forms, local database storage, and AI-powered candidate analysis.",
+  "requestFramePermissions": []
+}
