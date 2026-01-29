@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { BasicInfo, InterviewRecord, Stage } from '../types';
@@ -29,6 +29,7 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
   const [isAnalyzeLoading, setIsAnalyzeLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>(initialData?.aiSummary || '');
   const [activeStageId, setActiveStageId] = useState<string>(INTERVIEW_STAGES[0].id);
+  const [isSaveLoading, setIsSaveLoading] = useState(false);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -83,39 +84,72 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
     setExpandedQuestions(newExpanded);
   }, [activeStageId]);
 
-  const handleSave = () => {
+  const handleSave = async (shouldClose = false) => {
     if (!basicInfo.name) {
       alert("지원자명을 입력해주세요.");
       return;
     }
 
-    const record: InterviewRecord = {
-      id: initialData?.id || uuidv4(),
-      basicInfo,
-      answers,
-      resume,
-      aiSummary,
-      createdAt: initialData?.createdAt || Date.now()
-    };
+    setIsSaveLoading(true);
+    try {
+      const record: InterviewRecord = {
+        id: initialData?.id || uuidv4(),
+        basicInfo,
+        answers,
+        resume,
+        aiSummary,
+        createdAt: initialData?.createdAt || Date.now()
+      };
 
-    saveRecord(record);
-    onSave();
+      await saveRecord(record);
+
+      if (shouldClose) {
+        onSave();
+      } else {
+        alert("임시 저장되었습니다.");
+      }
+    } catch (error) {
+      // Error is already alerted in saveRecord but we catch here too just in case
+      console.error(error);
+    } finally {
+      setIsSaveLoading(false);
+    }
   };
+
+  // Scroll to top of stage content when stage changes
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Add a small delay to ensure DOM is updated and layout is stable
+    const timeoutId = setTimeout(() => {
+      const header = document.getElementById('candidate-info-header');
+      if (header) {
+        const appHeaderHeight = 64;
+        // Scroll to just above the sticky header's natural position
+        const targetY = Math.max(0, header.offsetTop - appHeaderHeight);
+        window.scrollTo({ top: targetY, behavior: 'smooth' });
+      }
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [activeStageId]);
 
   const handleNextStage = () => {
     if (activeStageIndex < INTERVIEW_STAGES.length - 1) {
       setActiveStageId(INTERVIEW_STAGES[activeStageIndex + 1].id);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      // Last stage
-      handleSave();
+      // Last stage - Save and Close
+      handleSave(true);
     }
   };
 
   const handlePrevStage = () => {
     if (activeStageIndex > 0) {
       setActiveStageId(INTERVIEW_STAGES[activeStageIndex - 1].id);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -144,7 +178,7 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
 
       {/* Basic Info Form */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 mt-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-0 mt-6">
         <h2 className="text-xl font-bold text-elleo-dark mb-4 border-b pb-2">기본 정보</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <Input
@@ -218,57 +252,57 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
 
       {/* Sticky Navigation Header */}
       {/* Removed negative margins to fix alignment issues. This bar now sits precisely within the content width. */}
-      {/* Sticky Navigation Header */}
-      {/* Masking Wrapper: Added border-x and border-t to ensure the card's visual structure remains visible when sticking */}
-      <div className="sticky top-[64px] z-50 bg-slate-50 pt-4 pb-6 px-0.5">
-        <div className="bg-white border border-slate-200 shadow-md rounded-xl overflow-hidden relative">
-
-          {/* Candidate Info Bar - Always visible in sticky header */}
-          <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center text-sm">
+      {/* Sticky Navigation Header - Candidate Info */}
+      <div id="candidate-info-header" className="sticky top-[65px] z-50 bg-slate-50 py-[28px] px-0">
+        <div className="bg-white border rounded-xl overflow-hidden relative">
+          <div className="bg-white px-6 py-4 border-1 border-slate-200 flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <span className="font-bold text-elleo-dark text-base">{basicInfo.name || '지원자명'}</span>
-              <span className="text-slate-300">|</span>
-              <span className="text-slate-600 font-medium">{basicInfo.position || '지원 포지션'}</span>
-              <span className="text-slate-300">|</span>
-              <span className="text-slate-500">{basicInfo.store || '지원 매장'}</span>
+              <span className="font-bold text-elleo-dark text-xl">{basicInfo.name || '지원자명'}</span>
+              <span className="text-slate-300 transform scale-125">|</span>
+              <span className="text-slate-600 font-bold text-lg">{basicInfo.position || '지원 포지션'}</span>
+              <span className="text-slate-300 transform scale-125">|</span>
+              <span className="text-slate-500 font-medium text-lg">{basicInfo.store || '지원 매장'}</span>
             </div>
             <div className="text-xs text-slate-400 font-mono hidden sm:block">
               Interview Mate
             </div>
           </div>
-
-          {/* Navigation Tabs */}
-          <div className="flex overflow-x-auto p-2 gap-2 no-scrollbar bg-white">
-            {INTERVIEW_STAGES.map((stage, index) => {
-              const isActive = activeStageId === stage.id;
-              // Extract simpler name for tab if needed, but the full title is requested to be simple now.
-              return (
-                <button
-                  key={stage.id}
-                  onClick={() => setActiveStageId(stage.id)}
-                  className={`px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all border ${isActive
-                    ? 'bg-elleo-purple text-white border-elleo-purple shadow-sm'
-                    : 'bg-white text-slate-500 border-slate-100 hover:border-slate-300 hover:text-slate-700 hover:bg-slate-50'
-                    }`}
-                >
-                  {stage.title}
-                </button>
-              );
-            })}
-          </div>
         </div>
       </div>
 
       {/* Active Stage Form Content */}
-      <div className="space-y-8 min-h-[400px]">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 animate-fadeIn">
-          {/* Masking Wrapper: Added border-x to restore card borders in the masked gap area */}
-          <div className="sticky top-[136px] z-40 bg-slate-50 pt-16 -mt-16 rounded-t-xl -mx-[1px] border-x border-slate-200">
-            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center rounded-t-xl shadow-sm border-t border-x border-slate-200 -mx-[1px] -mb-[1px]">
-              <h3 className="text-lg font-bold text-elleo-dark">{activeStage.title}</h3>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:block">
-                Step {activeStageIndex + 1} of {INTERVIEW_STAGES.length}
+      <div className="space-y-8 px-[1px] min-h-[400px]">
+        <div className="bg-white rounded-t-xl shadow-sm border border-slate-200 animate-fadeIn">
+
+          {/* Sticky Tabs Header (Formerly Title) */}
+          {/* Offset calculation: AppHeader(64px) + CandidateHeader(approx 116px due to py-7) = ~180px */}
+          <div className="sticky top-[183px] z-40 bg-slate-50 -mt-px rounded-t-xl -mx-[0px]">
+            <div className="bg-slate-50 px-5 py-4 border border-slate-200 flex items-center justify-between shadow-sm border-t border-x border-slate-200 -mx-[1px] -mb-[0px]">
+
+              {/* Navigation Tabs mapped here */}
+              <div className="flex overflow-x-auto gap-2 no-scrollbar w-full">
+                {INTERVIEW_STAGES.map((stage, index) => {
+                  const isActive = activeStageId === stage.id;
+                  return (
+                    <button
+                      key={stage.id}
+                      onClick={() => setActiveStageId(stage.id)}
+                      className={`px-4 py-2.5 rounded-lg text-sm font-bold whitespace-nowrap transition-all border ${isActive
+                        ? 'bg-elleo-purple text-white border-elleo-purple shadow-sm'
+                        : 'bg-white text-slate-500 border-slate-100 hover:border-slate-300 hover:text-slate-700 hover:bg-slate-50'
+                        }`}
+                    >
+                      {stage.title}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Optional Step Counter if space permits (hidden on small screens) */}
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider hidden lg:block ml-4 whitespace-nowrap">
+                Step {activeStageIndex + 1}/{INTERVIEW_STAGES.length}
               </span>
+
             </div>
           </div>
 
@@ -380,7 +414,7 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
             <pre className="whitespace-pre-wrap font-sans">{aiSummary}</pre>
           </div>
         ) : (
-          <div className="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-lg">
+          <div className="text-center py-32 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-lg">
             모든 질문에 답한 후 AI 분석을 실행하여 요약을 확인하세요.
           </div>
         )}
@@ -399,8 +433,9 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
             나가기
           </Button>
           <Button
-            onClick={handleSave}
+            onClick={() => handleSave(false)}
             variant="primary"
+            isLoading={isSaveLoading}
             className="px-3 py-1.5 text-xs sm:text-sm bg-elleo-dark hover:bg-[#1a2639] h-9 shadow-sm transition-colors"
           >
             임시 저장

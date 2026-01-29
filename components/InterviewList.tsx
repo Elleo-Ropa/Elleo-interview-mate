@@ -12,6 +12,7 @@ interface InterviewListProps {
 
 export const InterviewList: React.FC<InterviewListProps> = ({ onNew, onEdit }) => {
   const [records, setRecords] = useState<InterviewRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
@@ -20,14 +21,24 @@ export const InterviewList: React.FC<InterviewListProps> = ({ onNew, onEdit }) =
   }, []);
 
   useEffect(() => {
-    setRecords(getRecords().sort((a, b) => b.createdAt - a.createdAt));
+    const loadRecords = async () => {
+      setLoading(true);
+      const data = await getRecords();
+      setRecords(data);
+      setLoading(false);
+    };
+    loadRecords();
   }, []);
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('정말로 이 기록을 삭제하시겠습니까?')) {
-      deleteRecord(id);
-      setRecords(prev => prev.filter(r => r.id !== id));
+      try {
+        await deleteRecord(id);
+        setRecords(prev => prev.filter(r => r.id !== id));
+      } catch (error) {
+        alert('삭제 중 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -68,7 +79,12 @@ export const InterviewList: React.FC<InterviewListProps> = ({ onNew, onEdit }) =
         />
       </div>
 
-      {filteredRecords.length === 0 ? (
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-32 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <div className="w-12 h-12 border-4 border-elleo-purple/30 border-t-elleo-purple rounded-full animate-spin mb-4"></div>
+          <p className="text-slate-500 font-medium">기록을 불러오는 중입니다...</p>
+        </div>
+      ) : filteredRecords.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
           <svg className="mx-auto h-12 w-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

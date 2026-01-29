@@ -14,11 +14,12 @@ const getAllQuestions = (): Question[] => {
 };
 
 export const analyzeInterview = async (record: InterviewRecord): Promise<string> => {
-  if (!process.env.API_KEY) {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
     return "API Key is missing. Please configure your environment.";
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: apiKey });
   const allQuestions = getAllQuestions();
 
   // Construct a prompt context
