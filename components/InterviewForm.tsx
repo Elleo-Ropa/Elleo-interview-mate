@@ -8,6 +8,67 @@ import { Input } from './Input';
 import { saveRecord } from '../services/db';
 import { analyzeInterview } from '../services/geminiService';
 
+// Helper to parse bold text (**text**)
+const parseBold = (text: string) => {
+  const parts = text.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className="font-bold text-slate-900">{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+};
+
+// Helper to format AI Summary markdown
+const formatAISummary = (text: string) => {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  return (
+    <div className="space-y-3 text-slate-700 leading-relaxed">
+      {lines.map((line, index) => {
+        // Handle Headers (###)
+        if (line.startsWith('###')) {
+          const content = line.replace(/^###\s*/, '');
+          return (
+            <h3 key={index} className="text-lg font-bold text-elleo-dark mt-6 mb-2">
+              {parseBold(content)}
+            </h3>
+          );
+        }
+
+        // Handle List Items (* or -)
+        if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
+          const content = line.trim().replace(/^[\*\-]\s*/, '');
+          return (
+            <div key={index} className="flex items-start gap-2 ml-1">
+              <span className="text-elleo-purple mt-1.5">•</span>
+              <p className="flex-1">{parseBold(content)}</p>
+            </div>
+          )
+        }
+
+        // Handle Horizontal Rule (---)
+        if (line.trim() === '---') {
+          return <hr key={index} className="my-4 border-slate-200" />;
+        }
+
+        // Empty lines
+        if (!line.trim()) {
+          return <div key={index} className="h-2"></div>;
+        }
+
+        // Regular Paragraphs
+        return (
+          <p key={index} className="text-sm">
+            {parseBold(line)}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
 interface InterviewFormProps {
   initialData?: InterviewRecord;
   onSave: () => void;
@@ -271,7 +332,7 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
       </div>
 
       {/* Active Stage Form Content */}
-      <div className="space-y-8 px-[1px] min-h-[400px]">
+      <div className="space-y-8 px-[1px]">
         <div className="bg-white rounded-t-xl shadow-sm border border-slate-200 animate-fadeIn">
 
           {/* Sticky Tabs Header (Formerly Title) */}
@@ -410,8 +471,8 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
         </div>
 
         {aiSummary ? (
-          <div className="bg-slate-50 rounded-lg p-5 text-sm text-slate-700 prose prose-sm max-w-none border border-slate-200">
-            <pre className="whitespace-pre-wrap font-sans">{aiSummary}</pre>
+          <div className="bg-slate-50 rounded-lg p-6 text-sm text-slate-700 border border-slate-200">
+            {formatAISummary(aiSummary)}
           </div>
         ) : (
           <div className="text-center py-32 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-lg">
