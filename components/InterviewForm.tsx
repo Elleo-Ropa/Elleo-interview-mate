@@ -187,12 +187,11 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
 
     // Add a small delay to ensure DOM is updated and layout is stable
     const timeoutId = setTimeout(() => {
-      const header = document.getElementById('candidate-info-header');
-      if (header) {
-        const appHeaderHeight = 64;
-        // Scroll to just above the sticky header's natural position
-        const targetY = Math.max(0, header.offsetTop - appHeaderHeight);
-        window.scrollTo({ top: targetY, behavior: 'smooth' });
+      const content = document.getElementById('active-stage-content');
+      if (content) {
+        const contentTop = content.getBoundingClientRect().top + window.scrollY;
+        // Scroll so the content card starts exactly where the tabs sticky header is (183px offset)
+        window.scrollTo({ top: contentTop - 183, behavior: 'smooth' });
       }
     }, 100);
 
@@ -332,8 +331,8 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
       </div>
 
       {/* Active Stage Form Content */}
-      <div className="space-y-8 px-[1px]">
-        <div className="bg-white rounded-t-xl shadow-sm border border-slate-200 animate-fadeIn">
+      <div className="space-y-8 px-[1px] mb-8 relative z-0">
+        <div id="active-stage-content" className="bg-white rounded-t-xl shadow-sm border border-slate-200 animate-fadeIn min-h-[500px]">
 
           {/* Sticky Tabs Header (Formerly Title) */}
           {/* Offset calculation: AppHeader(64px) + CandidateHeader(approx 116px due to py-7) = ~180px */}
