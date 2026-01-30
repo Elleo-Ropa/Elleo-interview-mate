@@ -15,6 +15,7 @@ const AppContent: React.FC = () => {
   const [currentStages, setCurrentStages] = useState<Stage[]>(STANDARD_STAGES);
   const [currentInterviewType, setCurrentInterviewType] = useState<'STANDARD' | 'DEPTH'>('STANDARD');
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [showLogout, setShowLogout] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -100,20 +101,24 @@ const AppContent: React.FC = () => {
               </span>
             </div>
 
-            <div className="flex items-center gap-4">
-              {/* Profile Badge - Clickable to Sign Out */}
+            <div className="flex items-center gap-4 relative">
+              {/* Profile Badge - Toggles Logout Button */}
               <button
-                onClick={signOut}
-                className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200 hover:bg-rose-50 hover:border-rose-100 hover:shadow-sm transition-all group"
-                title="Sign Out"
+                onClick={() => setShowLogout(!showLogout)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${showLogout
+                    ? 'bg-rose-50 border-rose-200 shadow-sm'
+                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                  }`}
               >
-                <div className="w-6 h-6 rounded-full bg-indigo-100 group-hover:bg-rose-100 flex items-center justify-center transition-colors">
-                  <span className="text-[10px] font-bold text-indigo-700 group-hover:text-rose-700">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${showLogout ? 'bg-rose-100' : 'bg-indigo-100'
+                  }`}>
+                  <span className={`text-[10px] font-bold ${showLogout ? 'text-rose-700' : 'text-indigo-700'
+                    }`}>
                     {user.email?.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div className="flex flex-col text-left">
-                  <span className="text-xs font-semibold text-slate-700 leading-tight group-hover:text-rose-700">
+                  <span className="text-xs font-semibold text-slate-700 leading-tight">
                     {user.email?.split('@')[0]}
                   </span>
                   {userRole && (
@@ -124,6 +129,19 @@ const AppContent: React.FC = () => {
                   )}
                 </div>
               </button>
+
+              {/* Confirm Sign Out Button - Appears on click */}
+              {showLogout && (
+                <button
+                  onClick={signOut}
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-rose-600 text-white text-xs font-bold rounded-full hover:bg-rose-700 shadow-md hover:shadow-lg transition-all animate-in fade-in slide-in-from-left-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Sign Out
+                </button>
+              )}
 
               <div id="header-actions" className="flex items-center gap-3">
                 {/* Portals will render here */}
