@@ -7,7 +7,7 @@ const getAllQuestions = (): Question[] => {
   const questions: Question[] = [];
   INTERVIEW_STAGES.forEach(stage => {
     stage.sections.forEach(section => {
-      section.questions.forEach(q => questions.push(q));
+      section.questions?.forEach(q => questions.push(q));
     });
   });
   return questions;

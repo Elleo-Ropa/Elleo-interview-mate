@@ -6,14 +6,19 @@ export interface Question {
 
 export interface Section {
   id: string;
-  title: string;
-  questions: Question[];
+  title?: string;
+  questions?: Question[];
+  condition?: string;
+  notices?: string[];
+  requireConsent?: boolean;
 }
 
 export interface Stage {
   id: string;
   title: string;
   sections: Section[];
+  description?: string;
+  type?: 'question' | 'notice';
 }
 
 export interface BasicInfo {
@@ -22,6 +27,13 @@ export interface BasicInfo {
   store: string;
   date: string;
   interviewer: string;
+  hasSushiExperience: boolean;
+  visaStatus?: string;
+  visaExpiryDate?: string;
+  email?: string;
+  mobile?: string;
+  birthDate?: string;
+  interviewType?: 'STANDARD' | 'DEPTH';
 }
 
 export interface InterviewRecord {

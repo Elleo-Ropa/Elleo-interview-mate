@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { BasicInfo, InterviewRecord, Stage } from '../types';
-import { INTERVIEW_STAGES } from '../constants';
 import { Button } from './Button';
 import { Input } from './Input';
 import { saveRecord } from '../services/db';
@@ -71,17 +70,25 @@ const formatAISummary = (text: string) => {
 
 interface InterviewFormProps {
   initialData?: InterviewRecord;
+  stages: Stage[];
+  interviewType?: 'STANDARD' | 'DEPTH';
   onSave: () => void;
   onCancel: () => void;
 }
 
-export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSave, onCancel }) => {
-  const [basicInfo, setBasicInfo] = useState<BasicInfo>(initialData?.basicInfo || {
-    name: '',
-    position: '',
-    store: '',
-    date: new Date().toISOString().split('T')[0],
-    interviewer: ''
+export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, stages, interviewType = 'STANDARD', onSave, onCancel }) => {
+  const [basicInfo, setBasicInfo] = useState<BasicInfo>({
+    name: initialData?.basicInfo?.name || '',
+    position: initialData?.basicInfo?.position || '',
+    store: initialData?.basicInfo?.store || '',
+    date: initialData?.basicInfo?.date || new Date().toISOString().split('T')[0],
+    interviewer: initialData?.basicInfo?.interviewer || '',
+    hasSushiExperience: initialData?.basicInfo?.hasSushiExperience ?? false,
+    visaStatus: initialData?.basicInfo?.visaStatus || '',
+    visaExpiryDate: initialData?.basicInfo?.visaExpiryDate || '',
+    email: initialData?.basicInfo?.email || '',
+    mobile: initialData?.basicInfo?.mobile || '',
+    birthDate: initialData?.basicInfo?.birthDate || '',
   });
 
   const [answers, setAnswers] = useState<Record<string, string>>(initialData?.answers || {});
@@ -89,16 +96,42 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [isAnalyzeLoading, setIsAnalyzeLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>(initialData?.aiSummary || '');
-  const [activeStageId, setActiveStageId] = useState<string>(INTERVIEW_STAGES[0].id);
+  const [activeStageId, setActiveStageId] = useState<string>(stages[0].id);
   const [isSaveLoading, setIsSaveLoading] = useState(false);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Persist the record ID for the session. 
+  // If initialData exists, use it. Otherwise, generate one new ID and keep it.
+  const [recordId] = useState<string>(() => initialData?.id || uuidv4());
 
   useEffect(() => {
     setPortalTarget(document.getElementById('header-actions'));
   }, []);
 
-  const activeStageIndex = INTERVIEW_STAGES.findIndex(s => s.id === activeStageId);
-  const activeStage = INTERVIEW_STAGES[activeStageIndex];
+  // Scroll to top on mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  const activeStage = stages.find(s => s.id === activeStageId) || stages[0];
+  const activeStageIndex = stages.findIndex(s => s.id === activeStage.id);
+
+  // Auto-focus next question when Tab is pressed
+  useEffect(() => {
+    if (pendingFocusId) {
+      // Small delay to allow animation and DOM insertion
+      const timeoutId = setTimeout(() => {
+        const el = document.getElementById(`textarea-${pendingFocusId}`);
+        if (el) {
+          el.focus();
+        }
+        setPendingFocusId(null);
+      }, 50);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [pendingFocusId, expandedQuestions]);
 
   const handleAnswerChange = (questionId: string, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -136,7 +169,7 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
   useEffect(() => {
     const newExpanded = new Set(expandedQuestions);
     activeStage.sections.forEach(section => {
-      section.questions.forEach(q => {
+      section.questions?.forEach(q => {
         if (answers[q.id]) {
           newExpanded.add(q.id);
         }
@@ -154,8 +187,11 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
     setIsSaveLoading(true);
     try {
       const record: InterviewRecord = {
-        id: initialData?.id || uuidv4(),
-        basicInfo,
+        id: recordId, // Use the persistent ID
+        basicInfo: {
+          ...basicInfo,
+          interviewType: (interviewType as 'STANDARD' | 'DEPTH') || 'STANDARD'
+        },
         answers,
         resume,
         aiSummary,
@@ -178,29 +214,27 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
   };
 
   // Scroll to top of stage content when stage changes
-  const isFirstRender = useRef(true);
+  const prevStageIdRef = useRef(activeStageId);
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
+    if (prevStageIdRef.current !== activeStageId) {
+      prevStageIdRef.current = activeStageId;
+
+      // Add a small delay to ensure DOM is updated and layout is stable
+      const timeoutId = setTimeout(() => {
+        const content = document.getElementById('active-stage-content');
+        if (content) {
+          const contentTop = content.getBoundingClientRect().top + window.scrollY;
+          // Scroll so the content card starts exactly where the tabs sticky header is (183px offset)
+          window.scrollTo({ top: contentTop - 183, behavior: 'smooth' });
+        }
+      }, 100);
+      return () => clearTimeout(timeoutId);
     }
-
-    // Add a small delay to ensure DOM is updated and layout is stable
-    const timeoutId = setTimeout(() => {
-      const content = document.getElementById('active-stage-content');
-      if (content) {
-        const contentTop = content.getBoundingClientRect().top + window.scrollY;
-        // Scroll so the content card starts exactly where the tabs sticky header is (183px offset)
-        window.scrollTo({ top: contentTop - 183, behavior: 'smooth' });
-      }
-    }, 100);
-
-    return () => clearTimeout(timeoutId);
   }, [activeStageId]);
 
   const handleNextStage = () => {
-    if (activeStageIndex < INTERVIEW_STAGES.length - 1) {
-      setActiveStageId(INTERVIEW_STAGES[activeStageIndex + 1].id);
+    if (activeStageIndex < stages.length - 1) {
+      setActiveStageId(stages[activeStageIndex + 1].id);
     } else {
       // Last stage - Save and Close
       handleSave(true);
@@ -209,7 +243,7 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
 
   const handlePrevStage = () => {
     if (activeStageIndex > 0) {
-      setActiveStageId(INTERVIEW_STAGES[activeStageIndex - 1].id);
+      setActiveStageId(stages[activeStageIndex - 1].id);
     }
   };
 
@@ -231,6 +265,25 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
 
     const summary = await analyzeInterview(tempRecord);
     setAiSummary(summary);
+
+    // Auto-save the record with the new summary
+    const updatedRecord: InterviewRecord = {
+      ...tempRecord,
+      aiSummary: summary,
+      id: recordId, // Ensure we use the persistent ID
+      basicInfo: {
+        ...tempRecord.basicInfo,
+        interviewType: (interviewType as 'STANDARD' | 'DEPTH') || 'STANDARD'
+      }
+    };
+
+    try {
+      await saveRecord(updatedRecord);
+      // Optional: alert or toast? "AI Analysis Saved"
+    } catch (e) {
+      console.error("Failed to auto-save AI summary", e);
+    }
+
     setIsAnalyzeLoading(false);
   };
 
@@ -245,19 +298,61 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
             label="지원자명"
             value={basicInfo.name}
             onChange={e => setBasicInfo({ ...basicInfo, name: e.target.value })}
-            placeholder="홍길동"
           />
+          <Input
+            label="이메일"
+            type="email"
+            value={basicInfo.email || ''}
+            onChange={e => setBasicInfo({ ...basicInfo, email: e.target.value })}
+          />
+          <Input
+            label="연락처 (Mobile)"
+            value={basicInfo.mobile || ''}
+            onChange={e => setBasicInfo({ ...basicInfo, mobile: e.target.value })}
+          />
+          <Input
+            label="생년월일"
+            type="date"
+            value={basicInfo.birthDate || ''}
+            onChange={e => setBasicInfo({ ...basicInfo, birthDate: e.target.value })}
+          />
+          <div className="flex flex-col gap-1">
+            <label className="block text-sm font-bold text-slate-700">비자 상태</label>
+            <select
+              value={basicInfo.visaStatus || ''}
+              onChange={e => setBasicInfo({ ...basicInfo, visaStatus: e.target.value })}
+              className="block w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-elleo-purple/20 focus:border-elleo-purple text-sm transition-shadow h-[42px]"
+            >
+              <option value="" disabled>Select status...</option>
+              <option value="Australian Citizen">Australian Citizen</option>
+              <option value="Permanent Resident">Permanent Resident</option>
+              <option value="Partner / De facto">Partner / De facto</option>
+              <option value="International Student">International Student</option>
+              <option value="Working Holiday">Working Holiday</option>
+              <option value="Temporary Skill Shortage (TSS)">Temporary Skill Shortage (TSS)</option>
+              <option value="Others">Others</option>
+            </select>
+          </div>
+          <Input
+            label="비자 만료일"
+            type="date"
+            value={basicInfo.visaExpiryDate || ''}
+            onChange={e => setBasicInfo({ ...basicInfo, visaExpiryDate: e.target.value })}
+            disabled={basicInfo.visaStatus === 'Australian Citizen' || basicInfo.visaStatus === 'Permanent Resident'}
+          />
+
+          {/* Divider */}
+          <div className="col-span-1 md:col-span-2 lg:col-span-3 my-2 border-b border-slate-200 border-dashed" />
+
           <Input
             label="지원 포지션"
             value={basicInfo.position}
             onChange={e => setBasicInfo({ ...basicInfo, position: e.target.value })}
-            placeholder="예: 핫푸드"
           />
           <Input
             label="지원 매장"
             value={basicInfo.store}
             onChange={e => setBasicInfo({ ...basicInfo, store: e.target.value })}
-            placeholder="예: Broadway"
           />
           <Input
             label="면접관"
@@ -270,27 +365,43 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
             value={basicInfo.date}
             onChange={e => setBasicInfo({ ...basicInfo, date: e.target.value })}
           />
+          {interviewType !== 'DEPTH' && (
+            <div className="flex flex-col justify-end pb-1">
+              <label className="flex items-center gap-2 cursor-pointer py-2 px-4 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors h-[42px]">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-elleo-purple border-slate-300 rounded focus:ring-elleo-purple accent-elleo-purple"
+                  checked={basicInfo.hasSushiExperience}
+                  onChange={e => setBasicInfo({ ...basicInfo, hasSushiExperience: e.target.checked })}
+                />
+                <span className="text-sm font-bold text-slate-700">스시 경력 유무</span>
+              </label>
+            </div>
+          )}
         </div>
 
         {/* Resume Upload Section */}
         <div className="mt-4 border-t border-slate-100 pt-4">
-          <label className="block text-sm font-medium text-slate-700 mb-2">이력서 첨부</label>
+          <label className="block text-sm font-bold text-slate-700 mb-2">이력서 첨부</label>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="application/pdf,image/*"
+            className="hidden"
+          />
           {!resume ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="file"
-                onChange={handleFileChange}
-                accept="application/pdf,image/*"
-                className="block w-full text-sm text-slate-500
-                      file:mr-4 file:py-2 file:px-4
-                      file:rounded-full file:border-0
-                      file:text-sm file:font-semibold
-                      file:bg-elleo-purple-light file:text-elleo-dark
-                      file:transition-all file:duration-200
-                      file:cursor-pointer
-                      hover:file:bg-slate-800 hover:file:text-elleo-purple hover:file:shadow-md hover:file:-translate-y-0.5
-                      py-2 cursor-pointer"
-              />
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="py-2 px-6 rounded-full border-0 text-sm font-semibold bg-elleo-purple-light text-elleo-dark transition-all duration-200 cursor-pointer hover:bg-slate-800 hover:text-elleo-purple hover:shadow-md hover:-translate-y-0.5"
+              >
+                Choose file
+              </button>
+              <span className="text-sm text-slate-300 select-none cursor-default pointer-events-none">
+                No file chosen
+              </span>
             </div>
           ) : (
             <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
@@ -337,90 +448,234 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
           {/* Sticky Tabs Header (Formerly Title) */}
           {/* Offset calculation: AppHeader(64px) + CandidateHeader(approx 116px due to py-7) = ~180px */}
           <div className="sticky top-[183px] z-40 bg-slate-50 -mt-px rounded-t-xl -mx-[0px]">
-            <div className="bg-slate-50 px-5 py-4 border border-slate-200 flex items-center justify-between shadow-sm border-t border-x border-slate-200 -mx-[1px] -mb-[0px]">
+            <div className="bg-slate-50 px-5 py-4 border border-slate-200 shadow-sm border-t border-x border-slate-200 -mx-[1px] -mb-[0px]">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  {/* Navigation Tabs mapped here */}
+                  <div className="flex overflow-x-auto gap-2 no-scrollbar w-full">
+                    {stages.map((stage, index) => {
+                      const isActive = activeStageId === stage.id;
+                      return (
+                        <button
+                          key={stage.id}
+                          onClick={() => setActiveStageId(stage.id)}
+                          className={`px-4 py-2.5 rounded-lg text-sm font-bold whitespace-nowrap transition-all border ${isActive
+                            ? 'bg-elleo-purple text-white border-elleo-purple shadow-sm'
+                            : 'bg-white text-slate-500 border-slate-100 hover:border-slate-300 hover:text-slate-700 hover:bg-slate-50'
+                            }`}
+                        >
+                          {stage.title}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-              {/* Navigation Tabs mapped here */}
-              <div className="flex overflow-x-auto gap-2 no-scrollbar w-full">
-                {INTERVIEW_STAGES.map((stage, index) => {
-                  const isActive = activeStageId === stage.id;
-                  return (
-                    <button
-                      key={stage.id}
-                      onClick={() => setActiveStageId(stage.id)}
-                      className={`px-4 py-2.5 rounded-lg text-sm font-bold whitespace-nowrap transition-all border ${isActive
-                        ? 'bg-elleo-purple text-white border-elleo-purple shadow-sm'
-                        : 'bg-white text-slate-500 border-slate-100 hover:border-slate-300 hover:text-slate-700 hover:bg-slate-50'
-                        }`}
-                    >
-                      {stage.title}
-                    </button>
-                  );
-                })}
+                  {/* Optional Step Counter if space permits (hidden on small screens) */}
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider hidden lg:block ml-4 whitespace-nowrap">
+                    Step {activeStageIndex + 1}/{stages.length}
+                  </span>
+                </div>
+
+                {activeStage.description && (
+                  <div className="flex items-center justify-between gap-4 min-h-[32px]">
+                    <p className="text-[13px] text-slate-500 font-medium pl-1 animate-fadeIn">
+                      {activeStage.description}
+                    </p>
+                    {activeStage.id === 'stage2' && (
+                      <button
+                        onClick={() => setBasicInfo(prev => ({ ...prev, hasSushiExperience: !prev.hasSushiExperience }))}
+                        className={`text-[11px] px-2 py-1 rounded-md border transition-all ${basicInfo.hasSushiExperience
+                          ? 'bg-elleo-purple/10 border-elleo-purple text-elleo-purple font-bold'
+                          : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300'}`}
+                      >
+                        {basicInfo.hasSushiExperience ? '✓ 경력 질문 활성화됨' : '+ 경력 질문 보기'}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-
-              {/* Optional Step Counter if space permits (hidden on small screens) */}
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider hidden lg:block ml-4 whitespace-nowrap">
-                Step {activeStageIndex + 1}/{INTERVIEW_STAGES.length}
-              </span>
-
             </div>
           </div>
 
           <div className="p-6 space-y-8">
-            {activeStage.sections.map(section => (
-              <div key={section.id}>
-                <h4 className="text-md font-semibold text-elleo-dark mb-4 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-elleo-purple rounded-full inline-block"></span>
-                  {section.title}
-                </h4>
-                <div className="space-y-6">
-                  {section.questions.map(q => {
-                    const isExpanded = expandedQuestions.has(q.id);
-                    const hasAnswer = !!answers[q.id];
-
-                    return (
-                      <div key={q.id} className={`bg-slate-50 rounded-lg border transition-all duration-200 ${isExpanded ? 'border-elleo-purple ring-1 ring-elleo-purple/30 shadow-sm' : (hasAnswer ? 'border-elleo-purple' : 'border-slate-100 hover:border-elleo-purple/30')}`}>
-                        <div
-                          className="p-4 cursor-pointer flex justify-between items-start gap-4"
-                          onClick={() => toggleQuestion(q.id)}
-                        >
-                          <div className="flex-1 flex items-center justify-between gap-4">
-                            <p className={`font-medium ${isExpanded ? 'text-elleo-dark' : 'text-slate-700'}`}>{q.text}</p>
-                            {q.checkpoints && q.checkpoints.length > 0 && (
-                              <div className="flex flex-wrap gap-2 flex-shrink-0">
-                                {q.checkpoints.map((cp, idx) => (
-                                  <span key={idx} className="text-xs bg-[#f5f3ff] text-elleo-purple border border-elleo-purple px-2 py-0.5 rounded-[6px]">
-                                    {cp}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
-                            <svg className="w-5 h-5 text-slate-400 group-hover:text-elleo-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
+            {(activeStage?.sections || [])
+              .filter(section => {
+                if (!section.condition) return true;
+                const cond = section.condition.trim();
+                if (cond === '') return true;
+                if (cond === 'hasSushiExperience === true') return basicInfo.hasSushiExperience === true;
+                if (cond === 'hasSushiExperience === false') return basicInfo.hasSushiExperience === false;
+                return true;
+              })
+              .map(section => (
+                <div key={section.id}>
+                  {section.title && (
+                    <div className="flex items-center gap-3 mb-5 border-l-[3px] border-elleo-purple pl-3 py-1 bg-slate-50/50 rounded-r-lg">
+                      <h4 className="text-[15px] font-bold text-elleo-dark tracking-tight leading-none">
+                        {section.title}
+                      </h4>
+                    </div>
+                  )}
+                  <div className="space-y-6">
+                    {/* Render Notices as a Checklist */}
+                    {section.notices && section.notices.length > 0 && (
+                      <div className="bg-[#f8f7ff] border border-elleo-purple/20 rounded-lg p-5 space-y-4">
+                        <div className="space-y-3">
+                          {section.notices.map((notice, idx) => {
+                            const noticeKey = `notice-${section.id}-${idx}`;
+                            const isChecked = answers[noticeKey] === 'true';
+                            return (
+                              <label
+                                key={idx}
+                                className={`flex items-start gap-3 p-3 rounded-lg border transition-all cursor-pointer ${isChecked ? 'bg-white border-elleo-purple shadow-sm' : 'bg-white/50 border-slate-100 hover:border-elleo-purple/20'
+                                  }`}
+                              >
+                                <div className="mt-0.5">
+                                  <input
+                                    type="checkbox"
+                                    className="w-4 h-4 text-elleo-purple border-slate-300 rounded focus:ring-elleo-purple accent-elleo-purple"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      const newValue = e.target.checked ? 'true' : 'false';
+                                      setAnswers(prev => {
+                                        const next = { ...prev, [noticeKey]: newValue };
+                                        // If unchecking any notice, also uncheck the main consent
+                                        if (!e.target.checked) {
+                                          next[`consent-${section.id}`] = 'false';
+                                        }
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                </div>
+                                <p className={`text-sm leading-relaxed ${isChecked ? 'text-elleo-dark font-bold' : 'text-slate-600'}`}>
+                                  {notice}
+                                </p>
+                              </label>
+                            );
+                          })}
                         </div>
 
-                        {isExpanded && (
-                          <div className="px-4 pb-4 animate-fadeIn">
-                            <textarea
-                              className="w-full p-3 bg-white border border-slate-300 rounded-md focus:ring-0 focus:border-elleo-purple min-h-[100px] text-sm resize-y placeholder-slate-400 transition-shadow"
-                              placeholder="평가 내용을 입력하세요..."
-                              value={answers[q.id] || ''}
-                              onChange={e => handleAnswerChange(q.id, e.target.value)}
-                              autoFocus
-                              onClick={e => e.stopPropagation()}
-                            />
+                        {section.requireConsent && (
+                          <div className="pt-4 mt-2 border-t border-elleo-purple/10">
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                              <div className="relative flex items-center justify-center">
+                                <input
+                                  type="checkbox"
+                                  id={`consent-${section.id}`}
+                                  className="peer w-5 h-5 text-elleo-purple border-slate-300 rounded focus:ring-elleo-purple accent-elleo-purple"
+                                  checked={answers[`consent-${section.id}`] === 'true'}
+                                  onChange={(e) => {
+                                    const isChecked = e.target.checked;
+                                    setAnswers(prev => {
+                                      const next = { ...prev, [`consent-${section.id}`]: isChecked ? 'true' : 'false' };
+                                      // If checking the main consent, check all notices
+                                      if (isChecked && section.notices) {
+                                        section.notices.forEach((_, idx) => {
+                                          next[`notice-${section.id}-${idx}`] = 'true';
+                                        });
+                                      } else if (!isChecked && section.notices) {
+                                        // Optional: Uncheck all if main is unchecked
+                                        section.notices.forEach((_, idx) => {
+                                          next[`notice-${section.id}-${idx}`] = 'false';
+                                        });
+                                      }
+                                      return next;
+                                    });
+                                  }}
+                                />
+                              </div>
+                              <span className="text-sm font-bold text-elleo-dark group-hover:text-elleo-purple transition-colors">
+                                지원자에게 위 모든 고지사항을 안내하고 최종 동의를 확인했습니다.
+                              </span>
+                            </label>
                           </div>
                         )}
                       </div>
-                    );
-                  })}
+                    )}
+
+                    {/* Render Questions if they exist */}
+                    {section.questions?.map(q => {
+                      const isExpanded = expandedQuestions.has(q.id);
+                      const hasAnswer = !!answers[q.id];
+
+                      return (
+                        <div key={q.id} className={`bg-slate-50 rounded-lg border transition-all duration-200 ${isExpanded ? 'border-elleo-purple ring-1 ring-elleo-purple/30 shadow-sm' : (hasAnswer ? 'border-elleo-purple' : 'border-slate-100 hover:border-elleo-purple/30')}`}>
+                          <div
+                            className="p-4 cursor-pointer flex justify-between items-start gap-4"
+                            onClick={() => toggleQuestion(q.id)}
+                          >
+                            <div className="flex-1 flex items-center justify-between gap-4">
+                              <p className={`font-medium ${isExpanded ? 'text-elleo-dark' : 'text-slate-700'}`}>{q.text}</p>
+                              {q.checkpoints && q.checkpoints.length > 0 && (
+                                <div className="flex flex-wrap gap-2 flex-shrink-0">
+                                  {q.checkpoints.map((cp, idx) => (
+                                    <span key={idx} className="text-xs bg-[#f5f3ff] text-elleo-purple border border-elleo-purple px-2 py-0.5 rounded-[6px]">
+                                      {cp}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                              <svg className="w-5 h-5 text-slate-400 group-hover:text-elleo-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="px-4 pb-4 animate-fadeIn">
+                              <textarea
+                                id={`textarea-${q.id}`}
+                                name={`answer-${q.id}`}
+                                className="w-full p-3 bg-white border border-slate-300 rounded-md focus:ring-0 focus:border-elleo-purple min-h-[100px] text-sm resize-y placeholder-slate-400 transition-shadow"
+                                placeholder="평가 내용을 입력하세요..."
+                                value={answers[q.id] || ''}
+                                autoComplete="off"
+                                spellCheck={false}
+                                // @ts-ignore
+                                autoCorrect="off"
+                                onChange={e => handleAnswerChange(q.id, e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Tab') {
+                                    e.preventDefault(); // Stop browser default immediately
+
+                                    // Detect all visible questions to find next/prev
+                                    const visibleQuestions = (activeStage?.sections || [])
+                                      .filter(section => {
+                                        if (!section.condition) return true;
+                                        const cond = section.condition.trim();
+                                        if (cond === '') return true;
+                                        if (cond === 'hasSushiExperience === true') return basicInfo.hasSushiExperience === true;
+                                        if (cond === 'hasSushiExperience === false') return basicInfo.hasSushiExperience === false;
+                                        return true;
+                                      })
+                                      .flatMap(s => s.questions || []);
+
+                                    const currentIndex = visibleQuestions.findIndex(vq => vq.id === q.id);
+
+                                    if (!e.shiftKey && currentIndex < visibleQuestions.length - 1) {
+                                      const nextId = visibleQuestions[currentIndex + 1].id;
+                                      setExpandedQuestions(prev => new Set(prev).add(nextId));
+                                      setPendingFocusId(nextId);
+                                    } else if (e.shiftKey && currentIndex > 0) {
+                                      const prevId = visibleQuestions[currentIndex - 1].id;
+                                      setExpandedQuestions(prev => new Set(prev).add(prevId));
+                                      setPendingFocusId(prevId);
+                                    }
+                                  }
+                                }}
+                                onClick={e => e.stopPropagation()}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
             {/* Big Navigation Buttons */}
             <div className="grid grid-cols-2 gap-4 pt-8 border-t border-slate-100 mt-8">
@@ -437,13 +692,13 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
 
               <button
                 onClick={handleNextStage}
-                className={`py-3 px-4 rounded-xl font-bold text-white shadow-md transition-all flex items-center justify-center gap-2 ${activeStageIndex === INTERVIEW_STAGES.length - 1
+                className={`py-3 px-4 rounded-xl font-bold text-white shadow-md transition-all flex items-center justify-center gap-2 ${activeStageIndex === stages.length - 1
                   ? 'bg-elleo-dark hover:bg-slate-800'
                   : 'bg-elleo-purple hover:bg-[#8f8ed3]'
                   }`}
               >
-                {activeStageIndex === INTERVIEW_STAGES.length - 1 ? (
-                  <>작성 완료 (저장) <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg></>
+                {activeStageIndex === stages.length - 1 ? (
+                  <>작성 완료 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg></>
                 ) : (
                   <>다음 단계로 이동 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg></>
                 )}
@@ -483,26 +738,28 @@ export const InterviewForm: React.FC<InterviewFormProps> = ({ initialData, onSav
       {/* Global Bottom Actions (Backup) */}
       {/* Global Bottom Actions (Backup) */}
       {/* Global Header Actions via Portal */}
-      {portalTarget && createPortal(
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={onCancel}
-            className="px-3 py-1.5 text-xs sm:text-sm h-9 border-slate-300 hover:bg-slate-50 hover:border-slate-400 text-slate-600 transition-colors"
-          >
-            나가기
-          </Button>
-          <Button
-            onClick={() => handleSave(false)}
-            variant="primary"
-            isLoading={isSaveLoading}
-            className="px-3 py-1.5 text-xs sm:text-sm bg-elleo-dark hover:bg-[#1a2639] h-9 shadow-sm transition-colors"
-          >
-            임시 저장
-          </Button>
-        </div>,
-        portalTarget
-      )}
-    </div>
+      {
+        portalTarget && createPortal(
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={onCancel}
+              className="px-3 py-1.5 text-xs sm:text-sm h-9 border-slate-300 hover:bg-slate-50 hover:border-slate-400 text-slate-600 transition-colors"
+            >
+              나가기
+            </Button>
+            <Button
+              onClick={() => handleSave(false)}
+              variant="primary"
+              isLoading={isSaveLoading}
+              className="px-3 py-1.5 text-xs sm:text-sm bg-elleo-dark hover:bg-[#1a2639] h-9 shadow-sm transition-colors"
+            >
+              임시 저장
+            </Button>
+          </div>,
+          portalTarget
+        )
+      }
+    </div >
   );
 };

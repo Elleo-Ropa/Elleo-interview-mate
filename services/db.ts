@@ -54,7 +54,7 @@ export const saveRecord = async (record: InterviewRecord): Promise<void> => {
 export const getRecords = async (): Promise<InterviewRecord[]> => {
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select('*')
+    .select('id, basic_info, answers, ai_summary, created_at')
     .order('created_at', { ascending: false });
 
   if (error) {
