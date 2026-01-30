@@ -39,9 +39,17 @@ export const saveRecord = async (record: InterviewRecord): Promise<void> => {
     throw new Error(errorMsg);
   }
 
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    alert('로그인이 필요합니다.');
+    return;
+  }
+
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .upsert(dbRecord, { onConflict: 'id' });
+    .upsert({ ...dbRecord, user_id: user.id }, { onConflict: 'id' });
 
   if (error) {
     console.error('❌ Supabase Upsert Error:', error);
