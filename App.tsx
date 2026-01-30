@@ -101,6 +101,10 @@ const AppContent: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-4">
+              <div id="header-actions" className="flex items-center gap-3">
+                {/* Portals will render here */}
+              </div>
+
               <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
                 <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center">
                   <span className="text-[10px] font-bold text-indigo-700">
