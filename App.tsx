@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ViewState, InterviewRecord, Stage } from './types';
 import { InterviewForm } from './components/InterviewForm';
 import { InterviewList } from './components/InterviewList';
@@ -6,6 +6,7 @@ import { Login } from './components/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { INTERVIEW_STAGES as STANDARD_STAGES } from './constants';
 import { INTERVIEW_STAGES as DEPTH_STAGES } from './constants_in-depth';
+import { supabase } from './services/supabase';
 
 const AppContent: React.FC = () => {
   const { user, loading, signOut } = useAuth();
@@ -13,9 +14,29 @@ const AppContent: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<InterviewRecord | undefined>(undefined);
   const [currentStages, setCurrentStages] = useState<Stage[]>(STANDARD_STAGES);
   const [currentInterviewType, setCurrentInterviewType] = useState<'STANDARD' | 'DEPTH'>('STANDARD');
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      const fetchRole = async () => {
+        const { data } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        if (data) setUserRole(data.role);
+      };
+      fetchRole();
+    }
+  }, [user]);
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-500 font-medium">Loading Elleo Interview Mate...</p>
+      </div>
+    );
   }
 
   if (!user) {
@@ -30,7 +51,6 @@ const AppContent: React.FC = () => {
   };
 
   const handleEditInterview = async (partialRecord: InterviewRecord) => {
-    // Determine interview type from the partial record (or default)
     const type = partialRecord.basicInfo.interviewType || 'STANDARD';
     setCurrentInterviewType(type);
     setCurrentStages(type === 'STANDARD' ? STANDARD_STAGES : DEPTH_STAGES);
@@ -66,26 +86,47 @@ const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col">
       {/* Top Navigation Bar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center cursor-pointer gap-3" onClick={() => setView('LIST')}>
               <img
                 src="https://www.sushia.com.au/wp-content/uploads/2026/01/Elleo-Group-Logo-B.svg"
                 alt="Elleo Group Logo"
-                className="h-8 w-auto object-contain"
+                className="h-8 w-auto object-contain transition-transform hover:scale-105"
               />
-              <span className="text-lg font-bold text-elleo-dark border-l border-slate-300 pl-3 hidden sm:block">
+              <span className="text-lg font-bold text-slate-800 border-l border-slate-300 pl-3 hidden sm:block">
                 Interview Mate
               </span>
             </div>
 
-            <div id="header-actions" className="flex items-center gap-3">
-              <span className="text-sm text-gray-600 mr-2 hidden md:block">{user.email}</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
+                <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-indigo-700">
+                    {user.email?.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-semibold text-slate-700 leading-tight">
+                    {user.email?.split('@')[0]}
+                  </span>
+                  {userRole && (
+                    <span className={`text-[9px] uppercase tracking-wider font-bold ${userRole === 'admin' ? 'text-rose-600' : 'text-indigo-600'
+                      }`}>
+                      {userRole}
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <button
                 onClick={signOut}
-                className="text-sm text-gray-500 hover:text-gray-700 underline"
+                className="text-xs font-medium text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-1 group"
               >
+                <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
                 Sign Out
               </button>
             </div>
