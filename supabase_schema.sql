@@ -1,5 +1,5 @@
 -- 1. Create a table for public profiles (linked to auth.users)
-create table public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid references auth.users not null primary key,
   email text,
   role text default 'manager' check (role in ('admin', 'manager'))
@@ -41,50 +41,58 @@ create trigger on_auth_user_created
 
 -- 5. Update interview_records table
 -- Add user_id column if it doesn't exist
-alter table public.interview_records 
-add column if not exists user_id uuid references auth.users(id);
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='interview_records' AND column_name='user_id') THEN
+    ALTER TABLE public.interview_records ADD COLUMN user_id uuid REFERENCES auth.users(id);
+  END IF;
+END $$;
 
 -- Enable RLS
 alter table public.interview_records enable row level security;
 
--- 6. RLS Policies for interview_records
+-- [IMPORTANT] DROPPING OLD POLICIES TO PREVENT DUPLICATES
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Admins can do everything" ON interview_records;
+    DROP POLICY IF EXISTS "Managers can view own records" ON interview_records;
+    DROP POLICY IF EXISTS "Managers can insert own records" ON interview_records;
+    DROP POLICY IF EXISTS "Managers can update own records" ON interview_records;
+    DROP POLICY IF EXISTS "Managers can delete own records" ON interview_records;
+    DROP POLICY IF EXISTS "Enable read access for all users" ON interview_records; 
+END $$;
 
--- ADMIN Policy: Can do EVERYTHING (Select, Insert, Update, Delete)
-create policy "Admins can do everything"
-  on public.interview_records
-  for all
-  using (
-    exists (
-      select 1 from public.profiles
-      where profiles.id = auth.uid() and profiles.role = 'admin'
+-- 6. RLS Policies for interview_records (Refined)
+
+-- ADMIN Policy
+CREATE POLICY "Admins can do everything"
+  ON public.interview_records
+  FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
     )
   );
 
--- MANAGER Policy: Can only View/Edit THEIR OWN records
-create policy "Managers can view own records"
-  on public.interview_records
-  for select
-  using (
-    auth.uid() = user_id
-  );
+-- MANAGER Policy
+CREATE POLICY "Managers can view own records"
+  ON public.interview_records
+  FOR SELECT
+  USING ( auth.uid() = user_id );
 
-create policy "Managers can insert own records"
-  on public.interview_records
-  for insert
-  with check (
-    auth.uid() = user_id
-  );
+CREATE POLICY "Managers can insert own records"
+  ON public.interview_records
+  FOR INSERT
+  WITH CHECK ( auth.uid() = user_id );
 
-create policy "Managers can update own records"
-  on public.interview_records
-  for update
-  using (
-    auth.uid() = user_id
-  );
+CREATE POLICY "Managers can update own records"
+  ON public.interview_records
+  FOR UPDATE
+  USING ( auth.uid() = user_id )
+  WITH CHECK ( auth.uid() = user_id );
 
-create policy "Managers can delete own records"
-  on public.interview_records
-  for delete
-  using (
-    auth.uid() = user_id
-  );
+CREATE POLICY "Managers can delete own records"
+  ON public.interview_records
+  FOR DELETE
+  USING ( auth.uid() = user_id );
