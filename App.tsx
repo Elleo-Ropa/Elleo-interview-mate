@@ -101,18 +101,19 @@ const AppContent: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-4">
-              <div id="header-actions" className="flex items-center gap-3">
-                {/* Portals will render here */}
-              </div>
-
-              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
-                <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <span className="text-[10px] font-bold text-indigo-700">
+              {/* Profile Badge - Clickable to Sign Out */}
+              <button
+                onClick={signOut}
+                className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200 hover:bg-rose-50 hover:border-rose-100 hover:shadow-sm transition-all group"
+                title="Sign Out"
+              >
+                <div className="w-6 h-6 rounded-full bg-indigo-100 group-hover:bg-rose-100 flex items-center justify-center transition-colors">
+                  <span className="text-[10px] font-bold text-indigo-700 group-hover:text-rose-700">
                     {user.email?.charAt(0).toUpperCase()}
                   </span>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-slate-700 leading-tight">
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-semibold text-slate-700 leading-tight group-hover:text-rose-700">
                     {user.email?.split('@')[0]}
                   </span>
                   {userRole && (
@@ -122,17 +123,11 @@ const AppContent: React.FC = () => {
                     </span>
                   )}
                 </div>
-              </div>
-
-              <button
-                onClick={signOut}
-                className="text-xs font-medium text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-1 group"
-              >
-                <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Sign Out
               </button>
+
+              <div id="header-actions" className="flex items-center gap-3">
+                {/* Portals will render here */}
+              </div>
             </div>
           </div>
         </div>
