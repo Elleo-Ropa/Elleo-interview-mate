@@ -38,7 +38,7 @@ export const Login: React.FC = () => {
                 <div className="mt-8 space-y-6 w-full">
                     <button
                         onClick={handleGoogleLogin}
-                        className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-md text-white bg-elleo-purple hover:bg-elleo-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-elleo-purple transition-colors duration-200 shadow-md hover:shadow-lg"
+                        className="group relative w-64 mx-auto flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-md text-white bg-elleo-purple hover:bg-elleo-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-elleo-purple transition-colors duration-200 shadow-md hover:shadow-lg"
                     >
                         <span className="absolute left-0 inset-y-0 flex items-center pl-3">
                             {/* Google 'G' Logo (White version for contrast on purple) */}
