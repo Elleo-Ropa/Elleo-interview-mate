@@ -94,7 +94,7 @@ const AppContent: React.FC = () => {
               <img
                 src="https://www.sushia.com.au/wp-content/uploads/2026/01/Elleo-Group-Logo-B.svg"
                 alt="Elleo Group Logo"
-                className="h-8 w-auto object-contain transition-transform hover:scale-105"
+                className="h-8 w-auto object-contain transition-transform hover:scale-95"
               />
               <span className="text-lg font-bold text-slate-800 border-l border-slate-300 pl-3 hidden sm:block">
                 Interview Mate
@@ -107,8 +107,8 @@ const AppContent: React.FC = () => {
                 <button
                   onClick={() => setShowLogout(!showLogout)}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${showLogout
-                      ? 'bg-white border-indigo-200 shadow-md ring-2 ring-indigo-50'
-                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                    ? 'bg-white border-indigo-200 shadow-md ring-2 ring-indigo-50'
+                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                     }`}
                 >
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${showLogout ? 'bg-indigo-600 shadow-inner' : 'bg-indigo-100'
